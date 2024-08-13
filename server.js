@@ -1,7 +1,16 @@
 const PORT = 8000;
 import express from "express";
 import cors from "cors";
-import db from "./firebaseConfig";
+import db from "./firebaseConfig.js";
+import fs from "node:fs/promises";
+
+import {
+  Document,
+  MetadataMode,
+  VectorStoreIndex,
+} from "llamaindex";
+import dotenv from "dotenv"
+dotenv.config();
 
 
 
@@ -26,6 +35,25 @@ app.use(express.json());
 
 app.use(cors());
 app.post("/api/documents/process", async (req, res) => {
+  const {path} = req.body;
+  const essay = await fs.readFile(path, "utf-8");
+  const document = new Document({ text: essay, id_: path });
+  const index = await VectorStoreIndex.fromDocuments([document]);
+  const queryEngine = index.asQueryEngine();
+  const { response, sourceNodes } = await queryEngine.query({
+    query: "What did the author do in college?",
+  });
+  console.log(response.toString());
+  if (sourceNodes) {
+    sourceNodes.forEach((source, index) => {
+      console.log(
+        `\n${index}: Score: ${source.score} - ${source.node.getContent(MetadataMode.NONE).substring(0, 50)}...\n`,
+      );
+    });
+  }
+  res.send(sourceNodes)
+
+
 
   
 });
