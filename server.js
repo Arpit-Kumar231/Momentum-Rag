@@ -10,6 +10,7 @@ import multer from "multer";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { PineconeStore } from "@langchain/pinecone";
+import { v4 as uuidv4 } from "uuid";
 
 import { Document, MetadataMode, VectorStoreIndex } from "llamaindex";
 
@@ -20,10 +21,24 @@ import { Pinecone as PineconeClient } from "@pinecone-database/pinecone";
 import dotenv from "dotenv";
 dotenv.config();
 const pinecone = new PineconeClient();
-// let chatSessions = {};
-const upload = multer({ dest: "uploads/" });
-const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX);
+let chatSessions = {
+  "f6c75576-7a7f-407f-b1cf-6333d9531bc3": {
+    assetId: "f58a81d9-baed-40d0-852e-fc1ed8c10f58",
+    history: [],
+  },
+};
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "./uploads");
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = uuidv4();
+    cb(null, `${uniqueSuffix}-${file.originalname}`);
+  },
+});
 
+const upload = multer({ storage });
+const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX);
 
 const model = new OpenAI({
   model: "gpt-3.5-turbo-instruct",
@@ -51,31 +66,73 @@ app.use(express.json());
 
 app.use(cors());
 app.post("/api/documents/process", upload.single("file"), async (req, res) => {
-  console.log(req.body,"body")
-  console.log(req.file,"file")
-  const { file } = req.file;
-  
+  try {
+    const file = req.file;
 
-  const path = `uploads/Arpit.pdf`;
-  const loader = new PDFLoader(path);
+    const path = `uploads/${file.filename}`;
+    const loader = new PDFLoader(path);
+    const assetId = uuidv4();
 
-  const docs = await loader.load();
-  const data = docs[0].pageContent;
-  console.log(data +"data")
-  const docOutput = await splitter.createDocuments([data]);
-  const assetId = await vectorStore.addDocuments(docOutput);
-  res.send(assetId);
+    const docs = await loader.load();
+    const data = docs[0].pageContent;
+    const docOutput = await splitter.splitText(data);
+    const preparedDocs = docOutput.map((chunk) => ({
+      pageContent: chunk,
+      metadata: { assetId: assetId },
+    }));
+
+    await vectorStore.addDocuments(preparedDocs);
+    res.send(assetId);
+  } catch (err) {
+    console.error("Error processing document:", err);
+    res.status(500).json({ error: "Failed to process document" });
+  }
 });
 app.post("/api/chat/start", async (req, res) => {
+  const { assetId } = req.body;
+  const chatThreadId = uuidv4();
 
+  chatSessions[chatThreadId] = {
+    assetId,
+    history: [],
+  };
+
+  res.send({ chatThreadId });
 });
 app.post("/api/chat/message", async (req, res) => {
-  const { query } = req.body;
-  const retriever = vectorstore.asRetriever(4);
-  const retrievedDocuments = await retriever.invoke(query);
-  retrievedDocuments[0].pageContent;
+  const { chatThreadId, query } = req.body;
+  const session = chatSessions[chatThreadId];
+
+  if (!session) {
+    return res.status(404).send({ error: "Chat session not found" });
+  }
+
+  const retriever = vectorStore.asRetriever({ k: 2 });
+
+  const assetIdFilters = session.assetIds;
+  const retrievedDocuments = await retriever.invoke(query, {
+    filters: { asset_id: assetIdFilters },
+  });
+  console.log(retrievedDocuments, "retrieved");
+
+  const agentResponse = await model.generate({
+    prompt: retrievedDocuments.map((doc) => doc.pageContent).join("\n"),
+  });
+
+  session.history.push({ userMessage: query, agentResponse });
+
+  res.send({ response: agentResponse });
 });
-app.get("/api/chat/history", async (req, res) => {});
+app.get("/api/chat/history", async (req, res) => {
+  const { chatThreadId } = req.query;
+  const session = chatSessions[chatThreadId];
+
+  if (!session) {
+    return res.status(404).send({ error: "Chat session not found" });
+  }
+
+  res.send({ history: session.history });
+});
 app.listen(PORT, () => {
   console.log(`Listening on Port ${PORT}`);
 });
