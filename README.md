@@ -28,7 +28,6 @@ This API provides endpoints for processing PDF documents, initiating chat sessio
 
 - Node.js (v14 or later)
 - npm or yarn
-- Redis (for Dragonfly caching)
 - Pinecone account (for vector storage)
 - OpenAI API key
 
