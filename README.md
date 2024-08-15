@@ -43,14 +43,14 @@ This API provides endpoints for processing PDF documents, initiating chat sessio
 
 ### 1. Process Document
 
-Uploads and processes a PDF document, storing it in the vector database.
+Uploads and processes a any document, storing it in the vector database.
 
 - **URL:** `/api/documents/process`
 - **Method:** POST
 - **Content-Type:** multipart/form-data
 
 **Request Body:**
-- `file`: The PDF file to be processed (required)
+- `file`: The file to be processed (required)
 
 **Response:**
 - `200 OK`: Returns the generated assetId
@@ -84,11 +84,11 @@ Content-Type: application/json
 Request Body:
 
 
-
+`
 {
   "chatThreadId": "string",
   "query": "string"
-}
+}`
 **Response:**
 
 200 OK: Server-Sent Events stream
@@ -104,6 +104,7 @@ Method: GET
 Query Parameters:
 
 chatThreadId: The ID of the chat session (required)
+
 Response:
 
 200 OK: Returns the chat history
