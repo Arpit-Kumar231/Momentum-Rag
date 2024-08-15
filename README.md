@@ -100,7 +100,7 @@ Request Body:
 
 ### Get Chat History
 Retrieves the chat history for a specific chat session.
-- **URL:** `/api/chat/history`
+- **URL:** `/api/chat/history/:chatThreadId`
 - **Method:** GET
 - **Query Pamameters:**  chatThreadId: The ID of the chat session (required)
 
