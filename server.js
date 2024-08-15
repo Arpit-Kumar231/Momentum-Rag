@@ -2,15 +2,14 @@ const PORT = 8000;
 import express from "express";
 import cors from "cors";
 import db from "./firebaseConfig.js";
-import fs from "node:fs/promises";
 import { OpenAI } from "@langchain/openai";
 import { OpenAIEmbeddings } from "@langchain/openai";
-import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import multer from "multer";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { PineconeStore } from "@langchain/pinecone";
 import { v4 as uuidv4 } from "uuid";
+
 
 import { Document, MetadataMode, VectorStoreIndex } from "llamaindex";
 
@@ -44,6 +43,7 @@ const model = new OpenAI({
   model: "gpt-3.5-turbo-instruct",
   temperature: 0.3,
   apiKey: process.env.OPENAI_API_KEY,
+  streaming: true,
 });
 
 const embeddings = new OpenAIEmbeddings({
@@ -74,7 +74,7 @@ app.post("/api/documents/process", upload.single("file"), async (req, res) => {
     const assetId = uuidv4();
 
     const docs = await loader.load();
-    const data = docs[0].pageContent;
+    const data = docs.map((doc) => doc.pageContent).join("\n");
     const docOutput = await splitter.splitText(data);
     const preparedDocs = docOutput.map((chunk) => ({
       pageContent: chunk,
@@ -109,19 +109,46 @@ app.post("/api/chat/message", async (req, res) => {
 
   const retriever = vectorStore.asRetriever({ k: 2 });
 
-  const assetIdFilters = session.assetIds;
+  const assetIdFilters = session.assetId;
   const retrievedDocuments = await retriever.invoke(query, {
-    filters: { asset_id: assetIdFilters },
+    filters: { assetId: assetIdFilters },
   });
-  console.log(retrievedDocuments, "retrieved");
+  console.log(retrievedDocuments.map((doc) => doc.pageContent));
+  const prompt = `Based on the following information, please answer the user's query: "${query}"
 
-  const agentResponse = await model.generate({
-    prompt: retrievedDocuments.map((doc) => doc.pageContent).join("\n"),
+      Context:
+        ${retrievedDocuments.map((doc) => doc.pageContent).join("\n")}
+
+      Answer:`;
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
   });
 
-  session.history.push({ userMessage: query, agentResponse });
+  try {
+    const stream = await model.stream(prompt);
+    let fullResponse = '';
 
-  res.send({ response: agentResponse });
+    for await (const chunk of stream) {
+      fullResponse += chunk;
+      // Send each chunk as an SSE event
+      res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+    }
+
+    // Send a final event to signal completion
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
+
+    // Update session history after streaming is complete
+    session.history.push({ userMessage: query, agentResponse: fullResponse });
+
+  } catch (error) {
+    console.error("Error streaming response:", error);
+    res.write(`data: ${JSON.stringify({ error: "Failed to generate response" })}\n\n`);
+    res.end();
+  }
 });
 app.get("/api/chat/history", async (req, res) => {
   const { chatThreadId } = req.query;
