@@ -17,12 +17,12 @@ This API provides endpoints for processing PDF documents, initiating chat sessio
 
 ## Features
 
-- PDF document processing and storage
+- Document processing and storage
 - Chat sessions based on processed documents
 - Streaming responses for chat messages
 - Chat history retrieval
 - Rate limiting
-- Response caching
+
 
 ## Prerequisites
 
@@ -71,9 +71,10 @@ Initiates a new chat session for a specific document.
 
 **Response:**
 
-200 OK: Returns the chatThreadId
-429 Too Many Requests: Rate limit exceeded
-500 Internal Server Error: Server error occurred
+**Response:**
+- `200 OK`: Returns the chatThreadId
+- `429 Too Many Requests`: Rate limit exceeded
+- `500 Internal Server Error`: Server error occurred
 
 ### Send Chat Message
 Sends a message to the chat session and receives a streaming response.
@@ -89,6 +90,7 @@ Request Body:
   "chatThreadId": "string",
   "query": "string"
 }`
+
 **Response:**
 
 200 OK: Server-Sent Events stream
@@ -98,12 +100,12 @@ Request Body:
 
 ### Get Chat History
 Retrieves the chat history for a specific chat session.
+- **URL:** `/api/chat/history`
+- **Method:** GET
+- **Query Pamameters:**  chatThreadId: The ID of the chat session (required)
 
-URL: /api/chat/history
-Method: GET
-Query Parameters:
 
-chatThreadId: The ID of the chat session (required)
+
 
 Response:
 
