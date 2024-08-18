@@ -10,10 +10,8 @@ This API provides endpoints for processing PDF documents, initiating chat sessio
 - [Configuration](#configuration)
 - [API Endpoints](#api-endpoints)
 - [Rate Limiting](#rate-limiting)
-- [Caching](#caching)
 - [Error Handling](#error-handling)
-- [Contributing](#contributing)
-- [License](#license)
+
 
 ## Features
 
@@ -93,10 +91,10 @@ Request Body:
 
 **Response:**
 
-200 OK: Server-Sent Events stream
-404 Not Found: Chat session not found
-429 Too Many Requests: Rate limit exceeded
-500 Internal Server Error: Server error occurred
+- 200 OK: Server-Sent Events stream
+- 404 Not Found: Chat session not found
+- 429 Too Many Requests: Rate limit exceeded
+- 500 Internal Server Error: Server error occurred
 
 ### Get Chat History
 Retrieves the chat history for a specific chat session.
@@ -109,9 +107,9 @@ Retrieves the chat history for a specific chat session.
 
 Response:
 
-200 OK: Returns the chat history
-404 Not Found: Chat session not found
-429 Too Many Requests: Rate limit exceeded
-500 Internal Server Error: Server error occurred
+- 200 OK: Returns the chat history
+- 404 Not Found: Chat session not found
+- 429 Too Many Requests: Rate limit exceeded
+- 500 Internal Server Error: Server error occurred
 Rate Limiting
-The API implements a simple rate limiter allowing 10 requests per minute per IP address. Exceeding this limit will result in a 429 (Too Many Requests) error.
+The API implements a simple rate limiter allowing 20 requests per minute per IP address. Exceeding this limit will result in a 429 (Too Many Requests) error.
